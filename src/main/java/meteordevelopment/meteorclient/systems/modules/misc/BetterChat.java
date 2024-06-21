@@ -35,7 +35,10 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -222,7 +225,7 @@ public class BetterChat extends Module {
     );
 
     private static final Pattern antiSpamRegex = Pattern.compile(" \\(([0-9]+)\\)$");
-    private static final Pattern antiClearRegex = Pattern.compile("\\\\n(\\\\n|\\s)+\\\\n");
+    private static final Pattern antiClearRegex = Pattern.compile("\\n(\\n|\\s)+\\n");
     private static final Pattern timestampRegex = Pattern.compile("^(<[0-9]{2}:[0-9]{2}>\\s)");
     private static final Pattern usernameRegex = Pattern.compile("^(?:<[0-9]{2}:[0-9]{2}>\\s)?<(.*?)>.*");
 
@@ -240,10 +243,10 @@ public class BetterChat extends Module {
     }
 
     @EventHandler
-        private void onMessageReceive(ReceiveMessageEvent event) {
-            Text message = event.getMessage();
+    private void onMessageReceive(ReceiveMessageEvent event) {
+        Text message = event.getMessage();
 
-            if (filterRegex.get()) {
+        if (filterRegex.get()) {
             String messageString = message.getString();
             for (Pattern pattern : filterRegexList) {
                 if (pattern.matcher(messageString).find()) {
@@ -255,11 +258,11 @@ public class BetterChat extends Module {
 
         if (antiClear.get()) {
             String messageString = message.getString();
-            if (antiClearRegex.matcher(messageString).matches()) {
+            if (antiClearRegex.matcher(messageString).find()) {
                 MutableText newMessage = Text.empty();
                 TextVisitor.visit(message, (text, style, string) -> {
                     Matcher antiClearMatcher = antiClearRegex.matcher(string);
-                    if (antiClearMatcher.matches()) {
+                    if (antiClearMatcher.find()) {
                         // assume literal text content
                         newMessage.append(Text.literal(antiClearMatcher.replaceAll("\n\n")).setStyle(style));
                     } else {
