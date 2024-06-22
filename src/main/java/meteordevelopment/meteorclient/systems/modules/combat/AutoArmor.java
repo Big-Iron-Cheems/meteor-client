@@ -6,6 +6,7 @@
 package meteordevelopment.meteorclient.systems.modules.combat;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMaps;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.*;
@@ -15,7 +16,9 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.player.ChestSwap;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
+import meteordevelopment.meteorclient.utils.world.EnchantmentList;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.component.EnchantmentEffectComponentTypes;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.item.ArmorItem;
@@ -27,7 +30,6 @@ import net.minecraft.registry.entry.RegistryEntry;
 
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Set;
 
 public class AutoArmor extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -48,10 +50,11 @@ public class AutoArmor extends Module {
         .build()
     );
 
-    private final Setting<Set<RegistryKey<Enchantment>>> avoidedEnchantments = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<EnchantmentList> avoidedEnchantments = sgGeneral.add(new EnchantmentListSetting.Builder()
         .name("avoided-enchantments")
         .description("Enchantments that should be avoided.")
-        .defaultValue(Enchantments.BINDING_CURSE, Enchantments.FROST_WALKER)
+        .defaultValue(EnchantmentEffectComponentTypes.PREVENT_ARMOR_CHANGE)
+        .defaultValue(Enchantments.FROST_WALKER)
         .build()
     );
 
@@ -142,7 +145,7 @@ public class AutoArmor extends Module {
 
     private boolean hasAvoidedEnchantment() {
         for (RegistryEntry<Enchantment> enchantment : enchantments.keySet()) {
-            if (enchantment.matches(avoidedEnchantments.get()::contains)) {
+            if (avoidedEnchantments.get().contains(enchantment)) {
                 return true;
             }
         }
@@ -261,9 +264,11 @@ public class AutoArmor extends Module {
             Utils.getEnchantments(itemStack, enchantments);
 
             // Return if current armor piece has Curse of Binding
-            if (enchantments.containsKey(Enchantments.BINDING_CURSE)) {
-                score = Integer.MAX_VALUE; // Setting score to Integer.MAX_VALUE so its now swapped later
-                return;
+            for (RegistryEntry<Enchantment> enchantment : enchantments.keySet()) {
+                if (enchantment.value().effects().contains(EnchantmentEffectComponentTypes.PREVENT_ARMOR_CHANGE)) {
+                    score = Integer.MAX_VALUE; // Setting score to Integer.MAX_VALUE so its now swapped later
+                    return;
+                }
             }
 
             // Calculate current score
@@ -295,8 +300,10 @@ public class AutoArmor extends Module {
         }
 
         private int decreaseScoreByAvoidedEnchantments(int score) {
-            for (RegistryKey<Enchantment> enchantment : avoidedEnchantments.get()) {
-                score -= 2 * enchantments.getInt(enchantment);
+            for (Object2IntMap.Entry<RegistryEntry<Enchantment>> entry : Object2IntMaps.fastIterable(enchantments)) {
+                if (avoidedEnchantments.get().contains(entry.getKey())) {
+                    score -= 2 * entry.getIntValue();
+                }
             }
 
             return score;

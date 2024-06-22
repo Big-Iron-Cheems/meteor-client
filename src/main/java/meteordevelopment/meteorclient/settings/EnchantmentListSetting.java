@@ -5,54 +5,51 @@
 
 package meteordevelopment.meteorclient.settings;
 
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import meteordevelopment.meteorclient.utils.world.EnchantmentList;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.component.ComponentType;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
+import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.Identifier;
+import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.AccessFlag;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
-public class EnchantmentListSetting extends Setting<Set<RegistryKey<Enchantment>>> {
-    public EnchantmentListSetting(String name, String description, Set<RegistryKey<Enchantment>> defaultValue, Consumer<Set<RegistryKey<Enchantment>>> onChanged, Consumer<Setting<Set<RegistryKey<Enchantment>>>> onModuleActivated, IVisible visible) {
+public class EnchantmentListSetting extends Setting<EnchantmentList> {
+    public EnchantmentListSetting(String name, String description, EnchantmentList defaultValue, Consumer<EnchantmentList> onChanged, Consumer<Setting<EnchantmentList>> onModuleActivated, IVisible visible) {
         super(name, description, defaultValue, onChanged, onModuleActivated, visible);
     }
 
     @Override
     public void resetImpl() {
-        value = new ObjectOpenHashSet<>(defaultValue);
+        value = new EnchantmentList(defaultValue);
     }
 
     @Override
-    protected Set<RegistryKey<Enchantment>> parseImpl(String str) {
+    protected EnchantmentList parseImpl(String str) {
         String[] values = str.split(",");
-        Set<RegistryKey<Enchantment>> enchs = new ObjectOpenHashSet<>(values.length);
+        EnchantmentList enchs = new EnchantmentList();
 
         for (String value : values) {
-            String name = value.trim();
-
-            Identifier id;
-            if (name.contains(":")) id = Identifier.of(name);
-            else id = Identifier.ofVanilla(name);
-
-            enchs.add(RegistryKey.of(RegistryKeys.ENCHANTMENT, id));
+            enchs.addGeneric(value.trim());
         }
 
         return enchs;
     }
 
     @Override
-    protected boolean isValueValid(Set<RegistryKey<Enchantment>> value) {
+    protected boolean isValueValid(EnchantmentList value) {
         return true;
     }
 
@@ -65,63 +62,78 @@ public class EnchantmentListSetting extends Setting<Set<RegistryKey<Enchantment>
 
     @Override
     public NbtCompound save(NbtCompound tag) {
-        NbtList valueTag = new NbtList();
-        for (RegistryKey<Enchantment> ench : get()) {
-            valueTag.add(NbtString.of(ench.getValue().toString()));
+        NbtList literals = new NbtList();
+        for (RegistryKey<Enchantment> literal : get().literals) {
+            literals.add(NbtString.of(literal.getValue().toString()));
         }
-        tag.put("value", valueTag);
+        tag.put("literals", literals);
+
+
+        NbtList tags = new NbtList();
+        for (TagKey<Enchantment> tagKey : get().tags) {
+            tags.add(NbtString.of(tagKey.id().toString()));
+        }
+        tag.put("tags", tags);
+
+        NbtList effects = new NbtList();
+        for (ComponentType<?> effect : get().effects) {
+            @Nullable Identifier id = Registries.ENCHANTMENT_EFFECT_COMPONENT_TYPE.getId(effect);
+            if (id != null) effects.add(NbtString.of(id.toString()));
+        }
+        tag.put("effects", effects);
 
         return tag;
     }
 
     @Override
-    public Set<RegistryKey<Enchantment>> load(NbtCompound tag) {
+    public EnchantmentList load(NbtCompound tag) {
         get().clear();
 
-        NbtList valueTag = tag.getList("value", 8);
-        for (NbtElement tagI : valueTag) {
-            get().add(RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(tagI.asString())));
+        for (NbtElement tagI : tag.getList("literals", 8)) {
+            get().addLiteral(tagI.asString());
+        }
+
+        for (NbtElement tagI : tag.getList("tags", 8)) {
+            get().addTag(tagI.asString());
+        }
+
+        for (NbtElement tagI : tag.getList("effects", 8)) {
+            get().addEffect(tagI.asString());
         }
 
         return get();
     }
 
-    public static class Builder extends SettingBuilder<Builder, Set<RegistryKey<Enchantment>>, EnchantmentListSetting> {
-        private static final Set<RegistryKey<Enchantment>> VANILLA_DEFAULTS;
-
+    public static class Builder extends SettingBuilder<Builder, EnchantmentList, EnchantmentListSetting> {
         public Builder() {
-            super(new ObjectOpenHashSet<>());
+            super(new EnchantmentList());
         }
 
         public Builder vanillaDefaults() {
-            return defaultValue(VANILLA_DEFAULTS);
+            defaultValue.literals.addAll(EnchantmentList.DEFAULT_ENCHANTMENT_KEYS);
+            return this;
         }
 
         @SafeVarargs
         public final Builder defaultValue(RegistryKey<Enchantment>... defaults) {
-            return defaultValue(defaults != null ? new ObjectOpenHashSet<>(defaults) : new ObjectOpenHashSet<>());
+            defaultValue.literals.addAll(List.of(defaults));
+            return this;
+        }
+
+        @SafeVarargs
+        public final Builder defaultValue(TagKey<Enchantment>... defaults) {
+            defaultValue.tags.addAll(List.of(defaults));
+            return this;
+        }
+
+        public final Builder defaultValue(ComponentType<?>... defaults) {
+            defaultValue.effects.addAll(List.of(defaults));
+            return this;
         }
 
         @Override
         public EnchantmentListSetting build() {
             return new EnchantmentListSetting(name, description, defaultValue, onChanged, onModuleActivated, visible);
-        }
-
-        static {
-            //noinspection unchecked,rawtypes
-            VANILLA_DEFAULTS = (Set) Arrays.stream(Enchantments.class.getDeclaredFields())
-                .filter(field -> field.accessFlags().containsAll(List.of(AccessFlag.PUBLIC, AccessFlag.STATIC, AccessFlag.FINAL)))
-                .filter(field -> field.getType() == RegistryKey.class)
-                .map(field -> {
-                    try {
-                        return field.get(null);
-                    } catch (IllegalAccessException e) {
-                        return null;
-                    }
-                }).filter(Objects::nonNull)
-                .map(RegistryKey.class::cast)
-                .filter(registryKey -> registryKey.getRegistryRef() == RegistryKeys.ENCHANTMENT)
-                .collect(Collectors.toSet());
         }
     }
 }

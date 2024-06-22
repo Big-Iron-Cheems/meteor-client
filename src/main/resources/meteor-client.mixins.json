@@ -102,7 +102,6 @@
     "HeldItemRendererMixin",
     "HorseBaseEntityMixin",
     "HorseScreenHandlerAccessor",
-    "IdentifierAccessor",
     "InGameHudMixin",
     "InGameOverlayRendererMixin",
     "ItemEnchantmentsComponentMixin",

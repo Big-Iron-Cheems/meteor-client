@@ -27,16 +27,16 @@ import meteordevelopment.meteorclient.utils.render.NametagUtils;
 import meteordevelopment.meteorclient.utils.render.RenderUtils;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+import meteordevelopment.meteorclient.utils.world.EnchantmentList;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.component.EnchantmentEffectComponentTypes;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.*;
 import net.minecraft.entity.decoration.ItemFrameEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.EnchantmentTags;
 import net.minecraft.util.math.MathHelper;
@@ -187,16 +187,11 @@ public class Nametags extends Module {
         .build()
     );
 
-    private final Setting<Set<RegistryKey<Enchantment>>> shownEnchantments = sgPlayers.add(new EnchantmentListSetting.Builder()
+    private final Setting<EnchantmentList> shownEnchantments = sgPlayers.add(new EnchantmentListSetting.Builder()
         .name("shown-enchantments")
         .description("The enchantments that are shown on nametags.")
         .visible(() -> displayItems.get() && displayEnchants.get())
-        .defaultValue(
-            Enchantments.PROTECTION,
-            Enchantments.BLAST_PROTECTION,
-            Enchantments.FIRE_PROTECTION,
-            Enchantments.PROJECTILE_PROTECTION
-        )
+        .defaultValue(EnchantmentEffectComponentTypes.DAMAGE_PROTECTION, EnchantmentEffectComponentTypes.DAMAGE_IMMUNITY, EnchantmentEffectComponentTypes.DAMAGE)
         .build()
     );
 
@@ -490,7 +485,7 @@ public class Nametags extends Module {
 
                     int size = 0;
                     for (RegistryEntry<Enchantment> enchantment : enchantments.getEnchantments()) {
-                        if (enchantment.getKey().isPresent() && !shownEnchantments.get().contains(enchantment.getKey().get())) continue;
+                        if (!shownEnchantments.get().contains(enchantment)) continue;
                         String enchantName = Utils.getEnchantSimpleName(enchantment, enchantLength.get()) + " " + enchantments.getLevel(enchantment);
                         itemWidths[i] = Math.max(itemWidths[i], (text.getWidth(enchantName, shadow) / 2));
                         size++;
@@ -535,7 +530,7 @@ public class Nametags extends Module {
                     Object2IntMap<RegistryEntry<Enchantment>> enchantmentsToShow = new Object2IntOpenHashMap<>();
 
                     for (RegistryEntry<Enchantment> enchantment : enchantments.getEnchantments()) {
-                        if (enchantment.matches(shownEnchantments.get()::contains)) {
+                        if (shownEnchantments.get().contains(enchantment)) {
                             enchantmentsToShow.put(enchantment, enchantments.getLevel(enchantment));
                         }
                     }

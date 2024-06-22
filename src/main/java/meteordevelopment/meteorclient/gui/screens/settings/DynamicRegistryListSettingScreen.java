@@ -5,46 +5,37 @@
 
 package meteordevelopment.meteorclient.gui.screens.settings;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectIntImmutablePair;
+import it.unimi.dsi.fastutil.objects.ObjectIntPair;
 import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.WindowScreen;
 import meteordevelopment.meteorclient.gui.utils.Cell;
-import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.gui.widgets.containers.WHorizontalList;
+import meteordevelopment.meteorclient.gui.widgets.containers.WSection;
 import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.input.WTextBox;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WPressable;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.utils.Utils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.InvalidIdentifierException;
-import net.minecraft.util.Pair;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
-public abstract class DynamicRegistryListSettingScreen<E> extends WindowScreen {
-    protected final Setting<?> setting;
-    protected final Collection<RegistryKey<E>> collection;
-    private final RegistryKey<Registry<E>> registryKey;
-    private final Optional<Registry<E>> registry;
+public abstract class DynamicRegistryListSettingScreen<S> extends WindowScreen {
+    protected final Setting<S> setting;
+    private final boolean manualEntry;
 
     private WTextBox filter;
     private String filterText = "";
 
     private WTable table;
 
-    public DynamicRegistryListSettingScreen(GuiTheme theme, String title, Setting<?> setting, Collection<RegistryKey<E>> collection, RegistryKey<Registry<E>> registryKey) {
+    public DynamicRegistryListSettingScreen(GuiTheme theme, String title, Setting<S> setting, boolean manualEntry) {
         super(theme, title);
-
-        this.registryKey = registryKey;
-        this.registry = Optional.ofNullable(MinecraftClient.getInstance().getNetworkHandler())
-            .flatMap(networkHandler -> networkHandler.getRegistryManager().getOptional(registryKey));
         this.setting = setting;
-        this.collection = collection;
+        this.manualEntry = manualEntry;
     }
 
     @Override
@@ -66,117 +57,89 @@ public abstract class DynamicRegistryListSettingScreen<E> extends WindowScreen {
 
     private void generateWidgets() {
         // Left (all)
-        WTable left = abc(pairs -> registry.ifPresent(registry -> {
-            registry.streamEntries()
-                .map(RegistryEntry.Reference::getKey)
-                .filter(Optional::isPresent)
-                .map(Optional::get).forEach(t -> {
-                    if (skipValue(t) || collection.contains(t)) return;
+        WTable left = abc(true, getLeftSections());
 
-                    int words = Utils.searchInWords(getValueName(t), filterText);
-                    int diff = Utils.searchLevenshteinDefault(getValueName(t), filterText, false);
-                    if (words > 0 || diff <= getValueName(t).length() / 2) pairs.add(new Pair<>(t, -diff));
-                });
-            }), true, t -> {
-                addValue(t);
-
-                RegistryKey<E> v = getAdditionalValue(t);
-                if (v != null) addValue(v);
+        if (manualEntry) {
+            if (!left.cells.isEmpty()) {
+                left.add(theme.horizontalSeparator("Manual Entry")).expandX();
+                left.row();
             }
-        );
 
-        if (!left.cells.isEmpty()) {
-            left.add(theme.horizontalSeparator()).expandX();
-            left.row();
+            WHorizontalList wManualEntry = left.add(theme.horizontalList()).expandX().widget();
+            WTextBox textBox = wManualEntry.add(theme.textBox("")).expandX().minWidth(120).widget();
+            wManualEntry.add(theme.plus()).expandCellX().right().widget().action = () -> {
+                if (manualEntry(textBox.get())) {
+                    regenerateWidgets();
+                }
+            };
         }
-
-        WHorizontalList manualEntry = left.add(theme.horizontalList()).expandX().widget();
-        WTextBox textBox = manualEntry.add(theme.textBox("minecraft:")).expandX().minWidth(120d).widget();
-        manualEntry.add(theme.plus()).expandCellX().right().widget().action = () -> {
-            String entry = textBox.get().trim();
-            try {
-                Identifier id = entry.contains(":") ? Identifier.of(entry) : Identifier.ofVanilla(entry);
-                addValue(RegistryKey.of(registryKey, id));
-            } catch (InvalidIdentifierException e) {}
-        };
 
         table.add(theme.verticalSeparator()).expandWidgetY();
 
         // Right (selected)
-        abc(pairs -> {
-            for (RegistryKey<E> value : collection) {
-                if (skipValue(value)) continue;
-
-                int words = Utils.searchInWords(getValueName(value), filterText);
-                int diff = Utils.searchLevenshteinDefault(getValueName(value), filterText, false);
-                if (words > 0 || diff <= getValueName(value).length() / 2) pairs.add(new Pair<>(value, -diff));
-            }
-        }, false, t -> {
-            removeValue(t);
-
-            RegistryKey<E> v = getAdditionalValue(t);
-            if (v != null) removeValue(v);
-        });
+        abc(false, getRightSections());
     }
 
-    private void addValue(RegistryKey<E> value) {
-        if (!collection.contains(value)) {
-            collection.add(value);
-
-            setting.onChanged();
-            table.clear();
-            generateWidgets();
-        }
+    protected void regenerateWidgets() {
+        setting.onChanged();
+        table.clear();
+        generateWidgets();
     }
 
-    private void removeValue(RegistryKey<E> value) {
-        if (collection.remove(value)) {
-            setting.onChanged();
-            table.clear();
-            generateWidgets();
-        }
-    }
-
-    private WTable abc(Consumer<List<Pair<RegistryKey<E>, Integer>>> addValues, boolean isLeft, Consumer<RegistryKey<E>> buttonAction) {
+    private WTable abc(boolean isLeft, Section<?>... sections) {
         // Create
         Cell<WTable> cell = this.table.add(theme.table()).top();
         WTable table = cell.widget();
 
-        Consumer<RegistryKey<E>> forEach = t -> {
-            if (!includeValue(t)) return;
-
-            table.add(getValueWidget(t));
-
-            WPressable button = table.add(isLeft ? theme.plus() : theme.minus()).expandCellX().right().widget();
-            button.action = () -> buttonAction.accept(t);
-
-            table.row();
-        };
-
-        // Sort
-        List<Pair<RegistryKey<E>, Integer>> values = new ArrayList<>();
-        addValues.accept(values);
-        if (!filterText.isEmpty()) values.sort(Comparator.comparingInt(value -> -value.getRight()));
-        for (Pair<RegistryKey<E>, Integer> pair : values) forEach.accept(pair.getLeft());
+        for (Section<?> section : sections) {
+            section(table, section, isLeft);
+        }
 
         if (!table.cells.isEmpty()) cell.expandX();
 
         return table;
     }
 
-    protected boolean includeValue(RegistryKey<E> value) {
-        return true;
+    private <T> void section(WTable table, Section<T> section, boolean isLeft) {
+        if (!section.collection.isEmpty()) {
+            WSection wSection = table.add(theme.section(section.theName)).expandX().widget();
+            List<ObjectIntPair<WHorizontalList>> entries = new ObjectArrayList<>();
+
+            for (T object : section.collection) {
+                WHorizontalList horizontalList = theme.horizontalList();
+
+                String name = section.theNamer.apply(object);
+
+                horizontalList.add(theme.label(name));
+                WPressable button = horizontalList.add(isLeft ? theme.plus() : theme.minus()).expandCellX().right().widget();
+
+                button.action = () -> section.theOnClicker.accept(object);
+
+                if (!filterText.isBlank()) {
+                    boolean inWord = Utils.searchInWords(name, filterText) > 0;
+                    int diff = Utils.searchLevenshteinDefault(name, filterText, false);
+                    for (String alias : section.theAliaser.apply(object)) {
+                        diff = Math.min(diff, Utils.searchLevenshteinDefault(alias, filterText, false));
+                        inWord |= Utils.searchInWords(alias, filterText) > 0;
+                    }
+                    if (inWord || diff <= name.length() / 2) entries.add(new ObjectIntImmutablePair<>(horizontalList, -diff));
+                } else entries.add(new ObjectIntImmutablePair<>(horizontalList, 0));
+            }
+
+            if (!filterText.isBlank()) entries.sort(Comparator.comparingInt(value -> -value.rightInt()));
+            for (ObjectIntPair<WHorizontalList> entry : entries) wSection.add(entry.left()).expandX();
+
+            table.row();
+        }
     }
 
-    protected abstract WWidget getValueWidget(RegistryKey<E> value);
+    protected abstract Section<?>[] getLeftSections();
+    protected abstract Section<?>[] getRightSections();
+    protected abstract boolean manualEntry(String textBox);
 
-    protected abstract String getValueName(RegistryKey<E> value);
-
-    protected boolean skipValue(RegistryKey<E> value) {
-        return false;
-    }
-
-    protected RegistryKey<E> getAdditionalValue(RegistryKey<E> value) {
-        return null;
+    protected record Section<T>(String theName, Collection<T> collection, Function<T, String> theNamer, Consumer<T> theOnClicker, Function<T, String[]> theAliaser) {
+        public Section(String theName, Collection<T> collection, Function<T, String> theNamer, Consumer<T> theOnClicker) {
+            this(theName, collection, theNamer, theOnClicker, t -> new String[0]);
+        }
     }
 }

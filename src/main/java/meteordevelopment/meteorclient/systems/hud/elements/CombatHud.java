@@ -25,6 +25,7 @@ import meteordevelopment.meteorclient.utils.entity.TargetUtils;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+import meteordevelopment.meteorclient.utils.world.EnchantmentList;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.enchantment.Enchantment;
@@ -34,7 +35,6 @@ import net.minecraft.item.BedItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SwordItem;
-import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.EnchantmentTags;
 import net.minecraft.util.math.MathHelper;
@@ -87,7 +87,7 @@ public class CombatHud extends HudElement {
         .build()
     );
 
-    private final Setting<Set<RegistryKey<Enchantment>>> displayedEnchantments = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<EnchantmentList> displayedEnchantments = sgGeneral.add(new EnchantmentListSetting.Builder()
         .name("displayed-enchantments")
         .description("The enchantments that are shown on nametags.")
         .vanillaDefaults()
@@ -360,7 +360,7 @@ public class CombatHud extends HudElement {
                 List<ObjectIntPair<RegistryEntry<Enchantment>>> enchantmentsToShow = new ArrayList<>();
 
                 for (Object2IntMap.Entry<RegistryEntry<Enchantment>> entry : enchantments.getEnchantmentEntries()) {
-                    if (entry.getKey().matches(displayedEnchantments.get()::contains)) {
+                    if (displayedEnchantments.get().contains(entry.getKey())) {
                         enchantmentsToShow.add(new ObjectIntImmutablePair<>(entry.getKey(), entry.getIntValue()));
                     }
                 }

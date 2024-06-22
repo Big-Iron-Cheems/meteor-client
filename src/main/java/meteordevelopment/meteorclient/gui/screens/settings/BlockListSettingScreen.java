@@ -7,7 +7,6 @@ package meteordevelopment.meteorclient.gui.screens.settings;
 
 import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
-import meteordevelopment.meteorclient.mixin.IdentifierAccessor;
 import meteordevelopment.meteorclient.settings.BlockListSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.utils.misc.Names;
@@ -20,8 +19,6 @@ import java.util.List;
 import java.util.function.Predicate;
 
 public class BlockListSettingScreen extends RegistryListSettingScreen<Block> {
-    private static final Identifier ID = Identifier.of("minecraft", "");
-
     public BlockListSettingScreen(GuiTheme theme, Setting<List<Block>> setting) {
         super(theme, "Select Blocks", setting, setting.get(), Registries.BLOCK);
     }
@@ -54,7 +51,6 @@ public class BlockListSettingScreen extends RegistryListSettingScreen<Block> {
         String path = Registries.BLOCK.getId(value).getPath();
         if (!path.endsWith("_banner")) return null;
 
-        ((IdentifierAccessor) (Object) ID).setPath(path.substring(0, path.length() - 6) + "wall_banner");
-        return Registries.BLOCK.get(ID);
+        return Registries.BLOCK.get(Identifier.ofVanilla(path.substring(0, path.length() - 6) + "wall_banner"));
     }
 }

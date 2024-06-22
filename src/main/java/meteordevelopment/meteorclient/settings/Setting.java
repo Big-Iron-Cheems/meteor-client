@@ -158,7 +158,7 @@ public abstract class Setting<T> implements IGetter<T>, ISerializable<T> {
 
         Identifier id;
         if (name.contains(":")) id = Identifier.of(name);
-        else id = Identifier.of("minecraft", name);
+        else id = Identifier.ofVanilla(name);
         if (registry.containsId(id)) return registry.get(id);
 
         return null;

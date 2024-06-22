@@ -83,7 +83,6 @@ public class Names {
      * key -> entry, else key -> translation, else key -> identifier toString()
      * @author Crosby
      */
-    @SuppressWarnings("StringEquality")
     public static String get(RegistryKey<Enchantment> enchantment) {
         return enchantmentKeyNames.computeIfAbsent(enchantment, enchantment1 -> Optional.ofNullable(MinecraftClient.getInstance().getNetworkHandler())
             .map(ClientPlayNetworkHandler::getRegistryManager)
@@ -93,7 +92,7 @@ public class Names {
             .orElseGet(() -> {
                 String key = "enchantment." + enchantment1.getValue().toTranslationKey();
                 String translated = I18n.translate(key);
-                return translated == key ? enchantment1.getValue().toString() : translated;
+                return translated.equals(key) ? enchantment1.getValue().toString() : translated;
             }));
     }
 
