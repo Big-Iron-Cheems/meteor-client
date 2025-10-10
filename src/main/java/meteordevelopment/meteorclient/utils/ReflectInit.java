@@ -7,6 +7,7 @@ package meteordevelopment.meteorclient.utils;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
+import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.addons.AddonManager;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 
@@ -18,6 +19,8 @@ import java.util.stream.Collectors;
 
 public class ReflectInit {
     private static final List<String> addonPackages = new ArrayList<>();
+    private static ScanResult cachedScanResult;
+    private static final Map<Class<? extends Annotation>, Set<Method>> cachedMethods = new HashMap<>();
 
     private ReflectInit() {
     }
@@ -30,6 +33,12 @@ public class ReflectInit {
                 throw new RuntimeException("Addon \"%s\" is too old and cannot be ran.".formatted(addon.name), e);
             }
         }
+
+        if (cachedScanResult != null) {
+            cachedScanResult.close();
+            cachedScanResult = null;
+        }
+        cachedMethods.clear();
     }
 
     private static void add(MeteorAddon addon) {
@@ -85,27 +94,57 @@ public class ReflectInit {
         };
     }
 
-    private static Set<Method> getMethodsAnnotatedWith(Class<? extends Annotation> annotation) {
-        Set<Method> result = new HashSet<>();
+    private static ScanResult getScanResult() {
+        if (cachedScanResult != null) return cachedScanResult;
 
-        try (ScanResult scanResult = new ClassGraph()
-            .enableClassInfo()
+        long start = System.currentTimeMillis();
+
+        cachedScanResult = new ClassGraph()
             .enableMethodInfo()
             .enableAnnotationInfo()
             .acceptPackages(addonPackages.toArray(String[]::new))
-            .scan()) {
+            .scan();
 
-            scanResult.getClassesWithMethodAnnotation(annotation)
-                .forEach(classInfo -> classInfo.getDeclaredMethodInfo()
-                    .filter(methodInfo -> methodInfo.hasAnnotation(annotation))
-                    .forEach(methodInfo -> {
-                        try {
-                            result.add(methodInfo.loadClassAndGetMethod());
-                        } catch (IllegalArgumentException ignored) {
-                            // Skip methods that cannot be loaded
-                        }
-                    }));
-        }
+        long elapsed = System.currentTimeMillis() - start;
+        MeteorClient.LOG.info(
+            "ClassGraph initial scan took {} ms, scanned {} packages, found {} classes",
+            elapsed,
+            addonPackages.size(),
+            cachedScanResult.getAllClasses().size()
+        );
+
+        return cachedScanResult;
+    }
+
+    private static Set<Method> getMethodsAnnotatedWith(Class<? extends Annotation> annotation) {
+        if (cachedMethods.containsKey(annotation)) return cachedMethods.get(annotation);
+
+        ScanResult scanResult = getScanResult();
+        Set<Method> result = new HashSet<>();
+
+        long start = System.currentTimeMillis();
+
+        scanResult.getClassesWithMethodAnnotation(annotation)
+            .forEach(classInfo -> classInfo.getDeclaredMethodInfo()
+                .filter(methodInfo -> methodInfo.hasAnnotation(annotation))
+                .forEach(methodInfo -> {
+                    try {
+                        result.add(methodInfo.loadClassAndGetMethod());
+                    } catch (IllegalArgumentException ignored) {
+                        // skip methods that cannot be loaded
+                    }
+                }));
+
+        long elapsed = System.currentTimeMillis() - start;
+        MeteorClient.LOG.info(
+            "ClassGraph took {} ms to collect methods with @{}, found {} classes with {} annotated methods",
+            elapsed,
+            annotation.getSimpleName(),
+            scanResult.getClassesWithMethodAnnotation(annotation).size(),
+            result.size()
+        );
+
+        cachedMethods.put(annotation, result);
 
         return result;
     }
