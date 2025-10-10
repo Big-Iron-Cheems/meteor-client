@@ -5,10 +5,10 @@
 
 package meteordevelopment.meteorclient.utils;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
 import meteordevelopment.meteorclient.addons.AddonManager;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
-import org.reflections.Reflections;
-import org.reflections.scanners.Scanners;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
@@ -17,7 +17,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class ReflectInit {
-    private static final List<Reflections> reflections = new ArrayList<>();
+    private static final List<String> addonPackages = new ArrayList<>();
 
     private ReflectInit() {
     }
@@ -35,20 +35,21 @@ public class ReflectInit {
     private static void add(MeteorAddon addon) {
         String pkg = addon.getPackage();
         if (pkg == null || pkg.isBlank()) return;
-        reflections.add(new Reflections(pkg, Scanners.MethodsAnnotated));
+        addonPackages.add(pkg);
     }
 
     public static void init(Class<? extends Annotation> annotation) {
-        for (Reflections reflection : reflections) {
-            Set<Method> initTasks = reflection.getMethodsAnnotatedWith(annotation);
-            if (initTasks == null) return;
+        if (addonPackages.isEmpty()) return;
 
-            Map<Class<?>, List<Method>> byClass = initTasks.stream().collect(Collectors.groupingBy(Method::getDeclaringClass));
-            Set<Method> left = new HashSet<>(initTasks);
+        Set<Method> initTasks = getMethodsAnnotatedWith(annotation);
+        if (initTasks.isEmpty()) return;
 
-            for (Method m; (m = left.stream().findAny().orElse(null)) != null; ) {
-                reflectInit(m, annotation, left, byClass);
-            }
+        Map<Class<?>, List<Method>> byClass = initTasks.stream()
+            .collect(Collectors.groupingBy(Method::getDeclaringClass));
+        Set<Method> left = new HashSet<>(initTasks);
+
+        for (Method m; (m = left.stream().findAny().orElse(null)) != null; ) {
+            reflectInit(m, annotation, left, byClass);
         }
     }
 
@@ -66,9 +67,11 @@ public class ReflectInit {
         try {
             task.invoke(null);
         } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new IllegalStateException("Error running @%s task '%s.%s'".formatted(annotation.getSimpleName(), task.getDeclaringClass().getSimpleName(), task.getName()), e);
+            throw new IllegalStateException("Error running @%s task '%s.%s'"
+                .formatted(annotation.getSimpleName(), task.getDeclaringClass().getSimpleName(), task.getName()), e);
         } catch (NullPointerException e) {
-            throw new RuntimeException("Method \"%s\" using Init annotations from non-static context".formatted(task.getName()), e);
+            throw new RuntimeException("Method \"%s\" using Init annotations from non-static context"
+                .formatted(task.getName()), e);
         }
     }
 
@@ -80,5 +83,30 @@ public class ReflectInit {
             case PostInit post -> post.dependencies();
             default -> new Class<?>[]{};
         };
+    }
+
+    private static Set<Method> getMethodsAnnotatedWith(Class<? extends Annotation> annotation) {
+        Set<Method> result = new HashSet<>();
+
+        try (ScanResult scanResult = new ClassGraph()
+            .enableClassInfo()
+            .enableMethodInfo()
+            .enableAnnotationInfo()
+            .acceptPackages(addonPackages.toArray(String[]::new))
+            .scan()) {
+
+            scanResult.getClassesWithMethodAnnotation(annotation)
+                .forEach(classInfo -> classInfo.getDeclaredMethodInfo()
+                    .filter(methodInfo -> methodInfo.hasAnnotation(annotation))
+                    .forEach(methodInfo -> {
+                        try {
+                            result.add(methodInfo.loadClassAndGetMethod());
+                        } catch (IllegalArgumentException ignored) {
+                            // Skip methods that cannot be loaded
+                        }
+                    }));
+        }
+
+        return result;
     }
 }

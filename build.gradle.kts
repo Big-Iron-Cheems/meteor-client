@@ -96,7 +96,7 @@ dependencies {
     jij("meteordevelopment:orbit:${properties["orbit_version"] as String}")
     jij("org.meteordev:starscript:${properties["starscript_version"] as String}")
     jij("meteordevelopment:discord-ipc:${properties["discordipc_version"] as String}")
-    jij("org.reflections:reflections:${properties["reflections_version"] as String}")
+    jij("io.github.classgraph:classgraph:${properties["classgraph_version"] as String}")
     jij("io.netty:netty-handler-proxy:${properties["netty_version"] as String}") { isTransitive = false }
     jij("io.netty:netty-codec-socks:${properties["netty_version"] as String}") { isTransitive = false }
     jij("de.florianmichael:WaybackAuthLib:${properties["waybackauthlib_version"] as String}")
