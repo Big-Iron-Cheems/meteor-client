@@ -6,6 +6,7 @@
 package meteordevelopment.meteorclient.utils;
 
 import io.github.classgraph.ClassGraph;
+import io.github.classgraph.MethodInfo;
 import io.github.classgraph.ScanResult;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.addons.AddonManager;
@@ -20,7 +21,8 @@ import java.util.stream.Collectors;
 public class ReflectInit {
     private static final List<String> addonPackages = new ArrayList<>();
     private static ScanResult cachedScanResult;
-    private static final Map<Class<? extends Annotation>, Set<Method>> cachedMethods = new HashMap<>();
+    private static final Map<Class<? extends Annotation>, Set<MethodInfo>> cachedMethods = new HashMap<>();
+    private static final Map<MethodInfo, Method> lazyMethodCache = new HashMap<>();
 
     private ReflectInit() {
     }
@@ -39,6 +41,7 @@ public class ReflectInit {
             cachedScanResult = null;
         }
         cachedMethods.clear();
+        lazyMethodCache.clear();
     }
 
     private static void add(MeteorAddon addon) {
@@ -50,47 +53,49 @@ public class ReflectInit {
     public static void init(Class<? extends Annotation> annotation) {
         if (addonPackages.isEmpty()) return;
 
-        Set<Method> initTasks = getMethodsAnnotatedWith(annotation);
+        Set<MethodInfo> initTasks = getMethodsAnnotatedWith(annotation);
         if (initTasks.isEmpty()) return;
 
-        Map<Class<?>, List<Method>> byClass = initTasks.stream()
-            .collect(Collectors.groupingBy(Method::getDeclaringClass));
-        Set<Method> left = new HashSet<>(initTasks);
+        Map<String, List<MethodInfo>> byClassName = initTasks.stream()
+            .collect(Collectors.groupingBy(mi -> mi.getClassInfo().getName()));
 
-        for (Method m; (m = left.stream().findAny().orElse(null)) != null; ) {
-            reflectInit(m, annotation, left, byClass);
+        Set<MethodInfo> left = new HashSet<>(initTasks);
+
+        for (MethodInfo m; (m = left.stream().findAny().orElse(null)) != null; ) {
+            reflectInit(m, annotation, left, byClassName);
         }
     }
 
-    private static <T extends Annotation> void reflectInit(Method task, Class<T> annotation, Set<Method> left, Map<Class<?>, List<Method>> byClass) {
-        left.remove(task);
+    private static <T extends Annotation> void reflectInit(MethodInfo methodInfo, Class<T> annotation, Set<MethodInfo> left, Map<String, List<MethodInfo>> byClassName) {
+        left.remove(methodInfo);
 
-        for (Class<?> clazz : getDependencies(task, annotation)) {
-            for (Method m : byClass.getOrDefault(clazz, Collections.emptyList())) {
-                if (left.contains(m)) {
-                    reflectInit(m, annotation, left, byClass);
+        Method method = lazyMethodCache.computeIfAbsent(methodInfo, MethodInfo::loadClassAndGetMethod);
+
+        for (String className : getDependenciesNames(method, annotation)) {
+            for (MethodInfo mi : byClassName.getOrDefault(className, Collections.emptyList())) {
+                if (left.contains(mi)) {
+                    reflectInit(mi, annotation, left, byClassName);
                 }
             }
         }
 
         try {
-            task.invoke(null);
+            method.invoke(null);
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException("Error running @%s task '%s.%s'"
-                .formatted(annotation.getSimpleName(), task.getDeclaringClass().getSimpleName(), task.getName()), e);
+                .formatted(annotation.getSimpleName(), method.getDeclaringClass().getSimpleName(), method.getName()), e);
         } catch (NullPointerException e) {
             throw new RuntimeException("Method \"%s\" using Init annotations from non-static context"
-                .formatted(task.getName()), e);
+                .formatted(method.getName()), e);
         }
     }
 
-    private static <T extends Annotation> Class<?>[] getDependencies(Method task, Class<T> annotation) {
-        T init = task.getAnnotation(annotation);
-
-        return switch (init) {
-            case PreInit pre -> pre.dependencies();
-            case PostInit post -> post.dependencies();
-            default -> new Class<?>[]{};
+    private static <T extends Annotation> String[] getDependenciesNames(Method method, Class<T> annotation) {
+        Annotation ann = method.getAnnotation(annotation);
+        return switch (ann) {
+            case PreInit pre -> Arrays.stream(pre.dependencies()).map(Class::getName).toArray(String[]::new);
+            case PostInit post -> Arrays.stream(post.dependencies()).map(Class::getName).toArray(String[]::new);
+            case null, default -> new String[0];
         };
     }
 
@@ -116,24 +121,17 @@ public class ReflectInit {
         return cachedScanResult;
     }
 
-    private static Set<Method> getMethodsAnnotatedWith(Class<? extends Annotation> annotation) {
+    private static Set<MethodInfo> getMethodsAnnotatedWith(Class<? extends Annotation> annotation) {
         if (cachedMethods.containsKey(annotation)) return cachedMethods.get(annotation);
 
         ScanResult scanResult = getScanResult();
-        Set<Method> result = new HashSet<>();
+        Set<MethodInfo> result = new HashSet<>();
 
         long start = System.currentTimeMillis();
 
         scanResult.getClassesWithMethodAnnotation(annotation)
-            .forEach(classInfo -> classInfo.getDeclaredMethodInfo()
-                .filter(methodInfo -> methodInfo.hasAnnotation(annotation))
-                .forEach(methodInfo -> {
-                    try {
-                        result.add(methodInfo.loadClassAndGetMethod());
-                    } catch (IllegalArgumentException ignored) {
-                        // skip methods that cannot be loaded
-                    }
-                }));
+            .forEach(classInfo -> result.addAll(classInfo.getDeclaredMethodInfo()
+                .filter(methodInfo -> methodInfo.hasAnnotation(annotation))));
 
         long elapsed = System.currentTimeMillis() - start;
         MeteorClient.LOG.info(
