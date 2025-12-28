@@ -15,15 +15,15 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.systems.modules.Module;
-import net.minecraft.command.CommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.Component;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public class SettingArgumentType implements ArgumentType<String> {
     private static final SettingArgumentType INSTANCE = new SettingArgumentType();
-    private static final DynamicCommandExceptionType NO_SUCH_SETTING = new DynamicCommandExceptionType(name -> Text.literal("No such setting '" + name + "'."));
+    private static final DynamicCommandExceptionType NO_SUCH_SETTING = new DynamicCommandExceptionType(name -> Component.literal("No such setting '" + name + "'."));
 
     public static SettingArgumentType create() {
         return INSTANCE;
@@ -39,7 +39,8 @@ public class SettingArgumentType implements ArgumentType<String> {
         return setting;
     }
 
-    private SettingArgumentType() {}
+    private SettingArgumentType() {
+    }
 
     @Override
     public String parse(StringReader reader) throws CommandSyntaxException {
@@ -49,9 +50,9 @@ public class SettingArgumentType implements ArgumentType<String> {
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
         Stream<String> stream = Streams.stream(context.getArgument("module", Module.class).settings.iterator())
-                .flatMap(settings -> Streams.stream(settings.iterator()))
-                .map(setting -> setting.name);
+            .flatMap(settings -> Streams.stream(settings.iterator()))
+            .map(setting -> setting.name);
 
-        return CommandSource.suggestMatching(stream, builder);
+        return SharedSuggestionProvider.suggest(stream, builder);
     }
 }

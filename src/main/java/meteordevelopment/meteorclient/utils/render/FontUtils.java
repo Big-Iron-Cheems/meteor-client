@@ -44,10 +44,10 @@ public class FontUtils {
 
         if (
             bytes[0] != 0 ||
-            bytes[1] != 1 ||
-            bytes[2] != 0 ||
-            bytes[3] != 0 ||
-            bytes[4] != 0
+                bytes[1] != 1 ||
+                bytes[2] != 0 ||
+                bytes[3] != 0 ||
+                bytes[4] != 0
         ) return null;
 
         ByteBuffer buffer = BufferUtils.createByteBuffer(bytes.length).put(bytes).flip();
@@ -80,15 +80,17 @@ public class FontUtils {
     }
 
     public static List<File> getUFontDirs() {
-        return switch (Util.getOperatingSystem()) {
-            case WINDOWS -> List.of(new File(System.getProperty("user.home") + "\\AppData\\Local\\Microsoft\\Windows\\Fonts"));
+        return switch (Util.getPlatform()) {
+            case WINDOWS ->
+                List.of(new File(System.getProperty("user.home") + "\\AppData\\Local\\Microsoft\\Windows\\Fonts"));
             case OSX -> List.of(new File(System.getProperty("user.home") + "/Library/Fonts/"));
-            default -> List.of(new File(System.getProperty("user.home") + "/.local/share/fonts"), new File(System.getProperty("user.home") + "/.fonts"));
+            default ->
+                List.of(new File(System.getProperty("user.home") + "/.local/share/fonts"), new File(System.getProperty("user.home") + "/.fonts"));
         };
     }
 
     public static List<File> getSFontDirs() {
-        return switch (Util.getOperatingSystem()) {
+        return switch (Util.getPlatform()) {
             case WINDOWS -> List.of(new File(System.getenv("SystemRoot") + "\\Fonts"));
             case OSX -> List.of(new File("/System/Library/Fonts/"));
             default -> List.of(new File("/usr/share/fonts/"));
@@ -159,8 +161,7 @@ public class FontUtils {
     public static InputStream stream(File file) {
         try {
             return new FileInputStream(file);
-        }
-        catch (FileNotFoundException e) {
+        } catch (FileNotFoundException e) {
             e.printStackTrace();
             return null;
         }

@@ -74,7 +74,7 @@ sourceSets.create("launcher")
 dependencies {
     // Fabric
     minecraft(libs.minecraft)
-    mappings(variantOf(libs.yarn) { classifier("v2") })
+    mappings(loom.officialMojangMappings())
     modImplementation(libs.fabric.loader)
 
     val fapiVersion = libs.versions.fabric.api.get()

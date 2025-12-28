@@ -9,8 +9,8 @@ import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.EntityPosition;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.entity.PositionMoveRotation;
 
 public class NoRotate extends Module {
     public NoRotate() {
@@ -19,16 +19,16 @@ public class NoRotate extends Module {
 
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event) {
-        if (event.packet instanceof PlayerPositionLookS2CPacket packet) {
-            EntityPosition oldPosition = packet.change();
-            EntityPosition newPosition = new EntityPosition(
+        if (event.packet instanceof ClientboundPlayerPositionPacket packet) {
+            PositionMoveRotation oldPosition = packet.change();
+            PositionMoveRotation newPosition = new PositionMoveRotation(
                 oldPosition.position(),
                 oldPosition.deltaMovement(),
-                mc.player.getYaw(),
-                mc.player.getPitch()
+                mc.player.getYRot(),
+                mc.player.getXRot()
             );
-            event.packet = PlayerPositionLookS2CPacket.of(
-                packet.teleportId(),
+            event.packet = ClientboundPlayerPositionPacket.of(
+                packet.id(),
                 newPosition,
                 packet.relatives()
             );

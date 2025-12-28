@@ -23,23 +23,23 @@ import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.meteorclient.utils.world.TickRate;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.Tameable;
-import net.minecraft.entity.mob.EndermanEntity;
-import net.minecraft.entity.mob.PiglinEntity;
-import net.minecraft.entity.mob.ZombifiedPiglinEntity;
-import net.minecraft.entity.passive.AnimalEntity;
-import net.minecraft.entity.passive.WolfEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.*;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.GameMode;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.OwnableEntity;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.wolf.Wolf;
+import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.piglin.Piglin;
+import net.minecraft.world.entity.monster.zombie.ZombifiedPiglin;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.*;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -273,15 +273,15 @@ public class KillAura extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) {
+        if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameType.SPECTATOR) {
             stopAttacking();
             return;
         }
-        if (pauseOnUse.get() && (mc.interactionManager.isBreakingBlock() || mc.player.isUsingItem())) {
+        if (pauseOnUse.get() && (mc.gameMode.isDestroying() || mc.player.isUsingItem())) {
             stopAttacking();
             return;
         }
-        if (onlyOnClick.get() && !mc.options.attackKey.isPressed()) {
+        if (onlyOnClick.get() && !mc.options.keyAttack.isDown()) {
             stopAttacking();
             return;
         }
@@ -294,7 +294,7 @@ public class KillAura extends Module {
             return;
         }
         if (onlyOnLook.get()) {
-            Entity targeted = mc.targetedEntity;
+            Entity targeted = mc.crosshairPickEntity;
 
             if (targeted == null || !entityCheck(targeted)) {
                 stopAttacking();
@@ -302,7 +302,7 @@ public class KillAura extends Module {
             }
 
             targets.clear();
-            targets.add(mc.targetedEntity);
+            targets.add(mc.crosshairPickEntity);
         } else {
             targets.clear();
             TargetUtils.getList(targets, this::entityCheck, priority.get(), maxTargets.get());
@@ -317,7 +317,8 @@ public class KillAura extends Module {
 
         if (autoSwitch.get()) {
             FindItemResult weaponResult = new FindItemResult(mc.player.getInventory().getSelectedSlot(), -1);
-            if (attackWhenHolding.get() == AttackItems.Weapons) weaponResult = InvUtils.find(this::acceptableWeapon, 0, 8);
+            if (attackWhenHolding.get() == AttackItems.Weapons)
+                weaponResult = InvUtils.find(this::acceptableWeapon, 0, 8);
 
             if (shouldShieldBreak()) {
                 FindItemResult axeResult = InvUtils.find(itemStack -> itemStack.getItem() instanceof AxeItem, 0, 8);
@@ -325,20 +326,21 @@ public class KillAura extends Module {
             }
 
             if (!swapped) {
-                previousSlot  = mc.player.getInventory().getSelectedSlot();
+                previousSlot = mc.player.getInventory().getSelectedSlot();
                 swapped = true;
             }
 
             InvUtils.swap(weaponResult.slot(), false);
         }
 
-        if (!acceptableWeapon(mc.player.getMainHandStack())) {
+        if (!acceptableWeapon(mc.player.getMainHandItem())) {
             stopAttacking();
             return;
         }
 
         attacking = true;
-        if (rotation.get() == RotationMode.Always) Rotations.rotate(Rotations.getYaw(primary), Rotations.getPitch(primary, Target.Body));
+        if (rotation.get() == RotationMode.Always)
+            Rotations.rotate(Rotations.getYaw(primary), Rotations.getPitch(primary, Target.Body));
         if (pauseOnCombat.get() && PathManagers.get().isPathing() && !wasPathing) {
             PathManagers.get().pause();
             wasPathing = true;
@@ -349,7 +351,7 @@ public class KillAura extends Module {
 
     @EventHandler
     private void onSendPacket(PacketEvent.Send event) {
-        if (event.packet instanceof UpdateSelectedSlotC2SPacket) {
+        if (event.packet instanceof ServerboundSetCarriedItemPacket) {
             switchTimer = switchDelay.get();
         }
     }
@@ -370,7 +372,7 @@ public class KillAura extends Module {
 
     private boolean shouldShieldBreak() {
         for (Entity target : targets) {
-            if (target instanceof PlayerEntity player) {
+            if (target instanceof Player player) {
                 if (player.isBlocking() && shieldMode.get() == ShieldMode.Break) {
                     return true;
                 }
@@ -382,13 +384,14 @@ public class KillAura extends Module {
 
     private boolean entityCheck(Entity entity) {
         if (entity.equals(mc.player) || entity.equals(mc.getCameraEntity())) return false;
-        if ((entity instanceof LivingEntity livingEntity && livingEntity.isDead()) || !entity.isAlive()) return false;
+        if ((entity instanceof LivingEntity livingEntity && livingEntity.isDeadOrDying()) || !entity.isAlive())
+            return false;
 
-        Box hitbox = entity.getBoundingBox();
+        AABB hitbox = entity.getBoundingBox();
         if (!PlayerUtils.isWithin(
-            MathHelper.clamp(mc.player.getX(), hitbox.minX, hitbox.maxX),
-            MathHelper.clamp(mc.player.getY(), hitbox.minY, hitbox.maxY),
-            MathHelper.clamp(mc.player.getZ(), hitbox.minZ, hitbox.maxZ),
+            Mth.clamp(mc.player.getX(), hitbox.minX, hitbox.maxX),
+            Mth.clamp(mc.player.getY(), hitbox.minY, hitbox.maxY),
+            Mth.clamp(mc.player.getZ(), hitbox.minZ, hitbox.maxZ),
             range.get()
         )) return false;
 
@@ -396,23 +399,23 @@ public class KillAura extends Module {
         if (ignoreNamed.get() && entity.hasCustomName()) return false;
         if (!PlayerUtils.canSeeEntity(entity) && !PlayerUtils.isWithin(entity, wallsRange.get())) return false;
         if (ignoreTamed.get()) {
-            if (entity instanceof Tameable tameable
+            if (entity instanceof OwnableEntity tameable
                 && tameable.getOwner() != null
                 && tameable.getOwner().equals(mc.player)
             ) return false;
         }
         if (ignorePassive.get()) {
-            if (entity instanceof EndermanEntity enderman && !enderman.isAngry()) return false;
-            if (entity instanceof PiglinEntity piglin && !piglin.isAttacking()) return false;
-            if (entity instanceof ZombifiedPiglinEntity zombifiedPiglin && !zombifiedPiglin.isAttacking()) return false;
-            if (entity instanceof WolfEntity wolf && !wolf.isAttacking()) return false;
+            if (entity instanceof EnderMan enderman && !enderman.isCreepy()) return false;
+            if (entity instanceof Piglin piglin && !piglin.isAggressive()) return false;
+            if (entity instanceof ZombifiedPiglin zombifiedPiglin && !zombifiedPiglin.isAggressive()) return false;
+            if (entity instanceof Wolf wolf && !wolf.isAggressive()) return false;
         }
-        if (entity instanceof PlayerEntity player) {
+        if (entity instanceof Player player) {
             if (player.isCreative()) return false;
             if (!Friends.get().shouldAttack(player)) return false;
             if (shieldMode.get() == ShieldMode.Ignore && player.isBlocking()) return false;
         }
-        if (entity instanceof AnimalEntity animal) {
+        if (entity instanceof Animal animal) {
             return switch (mobAgeFilter.get()) {
                 case Baby -> animal.isBaby();
                 case Adult -> !animal.isBaby();
@@ -436,14 +439,15 @@ public class KillAura extends Module {
                 hitTimer++;
                 return false;
             } else return true;
-        } else return mc.player.getAttackCooldownProgress(delay) >= 1;
+        } else return mc.player.getAttackStrengthScale(delay) >= 1;
     }
 
     private void attack(Entity target) {
-        if (rotation.get() == RotationMode.OnHit) Rotations.rotate(Rotations.getYaw(target), Rotations.getPitch(target, Target.Body));
+        if (rotation.get() == RotationMode.OnHit)
+            Rotations.rotate(Rotations.getYaw(target), Rotations.getPitch(target, Target.Body));
 
-        mc.interactionManager.attackEntity(mc.player, target);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.gameMode.attack(mc.player, target);
+        mc.player.swing(InteractionHand.MAIN_HAND);
 
         hitTimer = 0;
     }
@@ -452,13 +456,13 @@ public class KillAura extends Module {
         if (shouldShieldBreak()) return stack.getItem() instanceof AxeItem;
         if (attackWhenHolding.get() == AttackItems.All) return true;
 
-        if (weapons.get().contains(Items.DIAMOND_SWORD) && stack.isIn(ItemTags.SWORDS)) return true;
-        if (weapons.get().contains(Items.DIAMOND_AXE) && stack.isIn(ItemTags.AXES)) return true;
-        if (weapons.get().contains(Items.DIAMOND_PICKAXE) && stack.isIn(ItemTags.PICKAXES)) return true;
-        if (weapons.get().contains(Items.DIAMOND_SHOVEL) && stack.isIn(ItemTags.SHOVELS)) return true;
-        if (weapons.get().contains(Items.DIAMOND_HOE) && stack.isIn(ItemTags.HOES)) return true;
+        if (weapons.get().contains(Items.DIAMOND_SWORD) && stack.is(ItemTags.SWORDS)) return true;
+        if (weapons.get().contains(Items.DIAMOND_AXE) && stack.is(ItemTags.AXES)) return true;
+        if (weapons.get().contains(Items.DIAMOND_PICKAXE) && stack.is(ItemTags.PICKAXES)) return true;
+        if (weapons.get().contains(Items.DIAMOND_SHOVEL) && stack.is(ItemTags.SHOVELS)) return true;
+        if (weapons.get().contains(Items.DIAMOND_HOE) && stack.is(ItemTags.HOES)) return true;
         if (weapons.get().contains(Items.MACE) && stack.getItem() instanceof MaceItem) return true;
-        if (weapons.get().contains(Items.DIAMOND_SPEAR) && stack.isIn(ItemTags.SPEARS)) return true;
+        if (weapons.get().contains(Items.DIAMOND_SPEAR) && stack.is(ItemTags.SPEARS)) return true;
         return weapons.get().contains(Items.TRIDENT) && stack.getItem() instanceof TridentItem;
     }
 

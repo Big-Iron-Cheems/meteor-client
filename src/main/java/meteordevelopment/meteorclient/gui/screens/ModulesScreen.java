@@ -19,8 +19,8 @@ import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.misc.NbtUtils;
-import net.minecraft.item.Items;
-import net.minecraft.util.Pair;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,16 +81,16 @@ public class ModulesScreen extends TabScreen {
     protected void createSearchW(WContainer w, String text) {
         if (!text.isEmpty()) {
             // Titles
-            List<Pair<Module, String>> modules = Modules.get().searchTitles(text);
+            List<Tuple<Module, String>> modules = Modules.get().searchTitles(text);
 
             if (!modules.isEmpty()) {
                 WSection section = w.add(theme.section("Modules")).expandX().widget();
                 section.spacing = 0;
 
                 int count = 0;
-                for (Pair<Module, String> p : modules) {
+                for (Tuple<Module, String> p : modules) {
                     if (count >= Config.get().moduleSearchCount.get() || count >= modules.size()) break;
-                    section.add(theme.module(p.getLeft(), p.getRight())).expandX();
+                    section.add(theme.module(p.getA(), p.getB())).expandX();
                     count++;
                 }
             }
@@ -117,7 +117,7 @@ public class ModulesScreen extends TabScreen {
         w.id = "search";
 
         if (theme.categoryIcons()) {
-            w.beforeHeaderInit = wContainer -> wContainer.add(theme.item(Items.COMPASS.getDefaultStack())).pad(2);
+            w.beforeHeaderInit = wContainer -> wContainer.add(theme.item(Items.COMPASS.getDefaultInstance())).pad(2);
         }
 
         c.add(w);
@@ -152,7 +152,7 @@ public class ModulesScreen extends TabScreen {
         w.spacing = 0;
 
         if (theme.categoryIcons()) {
-            w.beforeHeaderInit = wContainer -> wContainer.add(theme.item(Items.NETHER_STAR.getDefaultStack())).pad(2);
+            w.beforeHeaderInit = wContainer -> wContainer.add(theme.item(Items.NETHER_STAR.getDefaultInstance())).pad(2);
         }
 
         Cell<WWindow> cell = c.add(w);
@@ -193,7 +193,8 @@ public class ModulesScreen extends TabScreen {
     }
 
     @Override
-    public void reload() {}
+    public void reload() {
+    }
 
     // Stuff
 
@@ -227,8 +228,7 @@ public class ModulesScreen extends TabScreen {
             if (favorites == null) {
                 favorites = createFavorites(this);
                 if (favorites != null) windows.add(favorites.widget());
-            }
-            else {
+            } else {
                 favorites.widget().clear();
 
                 if (!createFavoritesW(favorites.widget())) {

@@ -18,13 +18,13 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.irisshaders.iris.api.v0.IrisApi;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.BlockView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.shapes.Shapes;
 
 import java.util.List;
 
@@ -38,7 +38,7 @@ public class Xray extends Module {
         .description("Which blocks to show x-rayed.")
         .defaultValue(ORES)
         .onChanged(v -> {
-            if (isActive()) mc.worldRenderer.reload();
+            if (isActive()) mc.levelRenderer.allChanged();
         })
         .build()
     );
@@ -50,7 +50,7 @@ public class Xray extends Module {
         .range(0, 255)
         .sliderMax(255)
         .onChanged(onChanged -> {
-            if (isActive()) mc.worldRenderer.reload();
+            if (isActive()) mc.levelRenderer.allChanged();
         })
         .build()
     );
@@ -60,7 +60,7 @@ public class Xray extends Module {
         .description("Show only exposed ores.")
         .defaultValue(false)
         .onChanged(onChanged -> {
-            if (isActive()) mc.worldRenderer.reload();
+            if (isActive()) mc.levelRenderer.allChanged();
         })
         .build());
 
@@ -70,25 +70,27 @@ public class Xray extends Module {
 
     @Override
     public void onActivate() {
-        mc.worldRenderer.reload();
+        mc.levelRenderer.allChanged();
     }
 
     @Override
     public void onDeactivate() {
-        mc.worldRenderer.reload();
+        mc.levelRenderer.allChanged();
     }
 
     @Override
     public WWidget getWidget(GuiTheme theme) {
-        if (MixinPlugin.isSodiumPresent) return theme.label("Warning: Due to Sodium in use, opacity is overridden to 0.");
-        if (MixinPlugin.isIrisPresent && IrisApi.getInstance().isShaderPackInUse()) return theme.label("Warning: Due to shaders in use, opacity is overridden to 0.");
+        if (MixinPlugin.isSodiumPresent)
+            return theme.label("Warning: Due to Sodium in use, opacity is overridden to 0.");
+        if (MixinPlugin.isIrisPresent && IrisApi.getInstance().isShaderPackInUse())
+            return theme.label("Warning: Due to shaders in use, opacity is overridden to 0.");
 
         return null;
     }
 
     @EventHandler
     private void onRenderBlockEntity(RenderBlockEntityEvent event) {
-        if (isBlocked(event.blockEntityState.blockState.getBlock(), event.blockEntityState.pos)) event.cancel();
+        if (isBlocked(event.blockEntityState.blockState.getBlock(), event.blockEntityState.blockPos)) event.cancel();
     }
 
     @EventHandler
@@ -101,11 +103,11 @@ public class Xray extends Module {
         event.lightLevel = 1;
     }
 
-    public boolean modifyDrawSide(BlockState state, BlockView view, BlockPos pos, Direction facing, boolean returns) {
+    public boolean modifyDrawSide(BlockState state, BlockGetter view, BlockPos pos, Direction facing, boolean returns) {
         if (!returns && !isBlocked(state.getBlock(), pos)) {
-            BlockPos adjPos = pos.offset(facing);
+            BlockPos adjPos = pos.relative(facing);
             BlockState adjState = view.getBlockState(adjPos);
-            return adjState.getCullingFace(facing.getOpposite()) != VoxelShapes.fullCube() || adjState.getBlock() != state.getBlock() || !adjState.isOpaqueFullCube() || isBlocked(adjState.getBlock(), adjPos);
+            return adjState.getFaceOcclusionShape(facing.getOpposite()) != Shapes.block() || adjState.getBlock() != state.getBlock() || !adjState.isSolidRender() || isBlocked(adjState.getBlock(), adjPos);
         }
 
         return returns;
@@ -120,7 +122,8 @@ public class Xray extends Module {
         Xray xray = Modules.get().get(Xray.class);
 
         if (wallHack.isActive() && wallHack.blocks.get().contains(state.getBlock())) {
-            if (MixinPlugin.isSodiumPresent || (MixinPlugin.isIrisPresent && IrisApi.getInstance().isShaderPackInUse())) return 0;
+            if (MixinPlugin.isSodiumPresent || (MixinPlugin.isIrisPresent && IrisApi.getInstance().isShaderPackInUse()))
+                return 0;
 
             int alpha;
 
@@ -128,8 +131,7 @@ public class Xray extends Module {
             else alpha = wallHack.opacity.get();
 
             return alpha;
-        }
-        else if (xray.isActive() && !wallHack.isActive() && xray.isBlocked(state.getBlock(), pos)) {
+        } else if (xray.isActive() && !wallHack.isActive() && xray.isBlocked(state.getBlock(), pos)) {
             return (MixinPlugin.isSodiumPresent || (MixinPlugin.isIrisPresent && IrisApi.getInstance().isShaderPackInUse())) ? 0 : xray.opacity.get();
         }
 

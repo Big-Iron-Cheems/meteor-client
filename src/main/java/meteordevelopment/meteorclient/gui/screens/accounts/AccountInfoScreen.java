@@ -29,7 +29,7 @@ public class AccountInfoScreen extends WindowScreen {
         WHorizontalList l = add(theme.horizontalList()).expandX().widget();
 
         WButton copy = theme.button("Copy");
-        copy.action = () -> mc.keyboard.setClipboard(e.getToken());
+        copy.action = () -> mc.keyboardHandler.setClipboard(e.getToken());
 
         l.add(theme.label("TheAltening token:"));
         l.add(theme.label(e.getToken()).color(Color.GRAY)).pad(5);

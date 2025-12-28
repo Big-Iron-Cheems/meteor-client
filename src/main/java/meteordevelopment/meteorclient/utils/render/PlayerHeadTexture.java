@@ -59,8 +59,7 @@ public class PlayerHeadTexture extends Texture {
                         head[i] = (byte) pixel[j];
                         i++;
                     }
-                }
-                else i += 4;
+                } else i += 4;
             }
         }
 
@@ -72,7 +71,7 @@ public class PlayerHeadTexture extends Texture {
     public PlayerHeadTexture() {
         super(8, 8, TextureFormat.RGBA8, FilterMode.NEAREST, FilterMode.NEAREST);
 
-        try (InputStream inputStream = mc.getResourceManager().getResource(MeteorClient.identifier("textures/steve.png")).get().getInputStream()) {
+        try (InputStream inputStream = mc.getResourceManager().getResource(MeteorClient.identifier("textures/steve.png")).get().open()) {
             ByteBuffer data = TextureUtil.readResource(inputStream);
             data.rewind();
 
@@ -86,8 +85,7 @@ public class PlayerHeadTexture extends Texture {
                 STBImage.stbi_image_free(image);
             }
             MemoryUtil.memFree(data);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

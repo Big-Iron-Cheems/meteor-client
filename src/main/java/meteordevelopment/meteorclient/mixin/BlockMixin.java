@@ -9,20 +9,21 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.movement.NoSlow;
 import meteordevelopment.meteorclient.systems.modules.movement.Slippy;
-import net.minecraft.block.AbstractBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.ItemConvertible;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(Block.class)
-public abstract class BlockMixin extends AbstractBlock implements ItemConvertible {
-    public BlockMixin(Settings settings) {
+public abstract class BlockMixin extends BlockBehaviour implements ItemLike {
+    public BlockMixin(Properties settings) {
         super(settings);
     }
 
-    @ModifyReturnValue(method = "getSlipperiness", at = @At("RETURN"))
+    @ModifyReturnValue(method = "getFriction", at = @At("RETURN"))
     public float getSlipperiness(float original) {
         // For some retarded reason Tweakeroo calls this method before meteor is initialized
         if (Modules.get() == null) return original;

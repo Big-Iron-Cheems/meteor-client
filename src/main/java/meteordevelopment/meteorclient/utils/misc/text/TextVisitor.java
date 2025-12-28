@@ -5,46 +5,48 @@
 
 package meteordevelopment.meteorclient.utils.misc.text;
 
-import net.minecraft.text.PlainTextContent;
-import net.minecraft.text.StringVisitable;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.contents.PlainTextContents;
 
 import java.util.ArrayDeque;
 import java.util.Optional;
 import java.util.Queue;
 
 /**
- * An extension of {@link StringVisitable.StyledVisitor} with access to the underlying {@link Text} objects.
- * @param <T> the optional short circuit return type, to match the semantics of {@link StringVisitable.Visitor} and {@link StringVisitable.StyledVisitor}.
+ * An extension of {@link FormattedText.StyledContentConsumer} with access to the underlying {@link Component} objects.
+ *
+ * @param <T> the optional short circuit return type, to match the semantics of {@link FormattedText.ContentConsumer} and {@link FormattedText.StyledContentConsumer}.
  * @author Crosby
  */
 @FunctionalInterface
 public interface TextVisitor<T> {
-    Optional<T> accept(Text text, Style style, String string);
+    Optional<T> accept(Component text, Style style, String string);
 
-    static <T> Optional<T> visit(Text text, TextVisitor<T> visitor, Style baseStyle) {
-        Queue<Text> queue = collectSiblings(text);
+    static <T> Optional<T> visit(Component text, TextVisitor<T> visitor, Style baseStyle) {
+        Queue<Component> queue = collectSiblings(text);
         return text.visit((style, string) -> visitor.accept(queue.remove(), style, string), baseStyle);
     }
 
     /**
-     * Collapses the tree of {@link Text} siblings into a one dimensional FIFO {@link Queue}. To match the behaviours of
-     * the {@link Text#visit(StringVisitable.Visitor)} and {@link Text#visit(StringVisitable.StyledVisitor, Style)}
-     * methods, texts with empty contents (created from {@link Text#empty()}) are ignored but their siblings are still
+     * Collapses the tree of {@link Component} siblings into a one dimensional FIFO {@link Queue}. To match the behaviours of
+     * the {@link Component#visit(FormattedText.ContentConsumer)} and {@link Component#visit(FormattedText.StyledContentConsumer, Style)}
+     * methods, texts with empty contents (created from {@link Component#empty()}) are ignored but their siblings are still
      * processed.
+     *
      * @param text the text
      * @return the text and its siblings in the order they appear when rendered.
      */
-    static ArrayDeque<Text> collectSiblings(Text text) {
-        ArrayDeque<Text> queue = new ArrayDeque<>();
+    static ArrayDeque<Component> collectSiblings(Component text) {
+        ArrayDeque<Component> queue = new ArrayDeque<>();
         collectSiblings(text, queue);
         return queue;
     }
 
-    private static void collectSiblings(Text text, Queue<Text> queue) {
-        if (!(text.getContent() instanceof PlainTextContent ptc) || !ptc.string().isEmpty()) queue.add(text);
-        for (Text sibling : text.getSiblings()) {
+    private static void collectSiblings(Component text, Queue<Component> queue) {
+        if (!(text.getContents() instanceof PlainTextContents ptc) || !ptc.text().isEmpty()) queue.add(text);
+        for (Component sibling : text.getSiblings()) {
             collectSiblings(sibling, queue);
         }
     }

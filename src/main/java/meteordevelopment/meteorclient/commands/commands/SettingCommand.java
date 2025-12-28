@@ -18,7 +18,7 @@ import meteordevelopment.meteorclient.gui.tabs.builtin.HudTab;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.Utils;
-import net.minecraft.command.CommandSource;
+import net.minecraft.commands.SharedSuggestionProvider;
 
 public class SettingCommand extends Command {
     public SettingCommand() {
@@ -26,7 +26,7 @@ public class SettingCommand extends Command {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<SharedSuggestionProvider> builder) {
         builder.then(
             literal("hud")
                 .executes(context -> {
@@ -54,9 +54,9 @@ public class SettingCommand extends Command {
 
         // View or change settings
         builder.then(
-                argument("module", ModuleArgumentType.create())
+            argument("module", ModuleArgumentType.create())
                 .then(
-                        argument("setting", SettingArgumentType.create())
+                    argument("setting", SettingArgumentType.create())
                         .executes(context -> {
                             // Get setting value
                             Setting<?> setting = SettingArgumentType.get(context);
@@ -66,7 +66,7 @@ public class SettingCommand extends Command {
                             return SINGLE_SUCCESS;
                         })
                         .then(
-                                argument("value", SettingValueArgumentType.create())
+                            argument("value", SettingValueArgumentType.create())
                                 .executes(context -> {
                                     // Set setting value
                                     Setting<?> setting = SettingArgumentType.get(context);

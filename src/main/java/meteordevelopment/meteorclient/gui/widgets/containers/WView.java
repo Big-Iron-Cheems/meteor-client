@@ -8,8 +8,8 @@ package meteordevelopment.meteorclient.gui.widgets.containers;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.utils.Utils;
-import net.minecraft.client.gui.Click;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.util.Mth;
 
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
 
@@ -52,8 +52,7 @@ public abstract class WView extends WVerticalList {
             }
 
             if (couldScroll) moveAfterPositionWidgets = true;
-        }
-        else {
+        } else {
             actualHeight = height;
             scroll = 0;
             targetScroll = 0;
@@ -65,7 +64,7 @@ public abstract class WView extends WVerticalList {
         super.onCalculateWidgetPositions();
 
         if (moveAfterPositionWidgets) {
-            scroll = MathHelper.clamp(scroll, 0, actualHeight - height);
+            scroll = Mth.clamp(scroll, 0, actualHeight - height);
             targetScroll = scroll;
 
             moveCells(0, -scroll);
@@ -75,7 +74,7 @@ public abstract class WView extends WVerticalList {
     }
 
     @Override
-    public boolean onMouseClicked(Click click, boolean doubled) {
+    public boolean onMouseClicked(MouseButtonEvent click, boolean doubled) {
         if (handleMouseOver && click.button() == GLFW_MOUSE_BUTTON_LEFT && !doubled) {
             handlePressed = true;
             return true;
@@ -85,7 +84,7 @@ public abstract class WView extends WVerticalList {
     }
 
     @Override
-    public boolean onMouseReleased(Click click) {
+    public boolean onMouseReleased(MouseButtonEvent click) {
         if (handlePressed) handlePressed = false;
 
         return false;
@@ -111,7 +110,7 @@ public abstract class WView extends WVerticalList {
             //scroll += Math.round(theme.scale(mouseDelta + mouseDelta * ((height / actualHeight) * 0.7627725)));
             //scroll += Math.round(theme.scale(mouseDelta * (1 / (height / actualHeight))));
             scroll += Math.round(mouseDelta * ((actualHeight - handleHeight() / 2) / height));
-            scroll = MathHelper.clamp(scroll, 0, actualHeight - height);
+            scroll = Mth.clamp(scroll, 0, actualHeight - height);
 
             targetScroll = scroll;
 
@@ -124,7 +123,7 @@ public abstract class WView extends WVerticalList {
     public boolean onMouseScrolled(double amount) {
         if (!scrollOnlyWhenMouseOver || mouseOver) {
             targetScroll -= Math.round(theme.scale(amount * 40));
-            targetScroll = MathHelper.clamp(targetScroll, 0, actualHeight - height);
+            targetScroll = Mth.clamp(targetScroll, 0, actualHeight - height);
             return true;
         }
 
@@ -150,13 +149,12 @@ public abstract class WView extends WVerticalList {
         else if (targetScroll > scroll) {
             scroll += Math.round(theme.scale(delta * 300 + delta * 100 * (Math.abs(targetScroll - scroll) / 10)));
             if (scroll > targetScroll) scroll = targetScroll;
-        }
-        else if (targetScroll < scroll) {
+        } else if (targetScroll < scroll) {
             scroll -= Math.round(theme.scale(delta * 300 + delta * 100 * (Math.abs(targetScroll - scroll) / 10)));
             if (scroll < targetScroll) scroll = targetScroll;
         }
 
-        scroll = MathHelper.clamp(scroll, 0, max);
+        scroll = Mth.clamp(scroll, 0, max);
 
         double change = scroll - preScroll;
         if (change != 0) moveCells(0, -change);

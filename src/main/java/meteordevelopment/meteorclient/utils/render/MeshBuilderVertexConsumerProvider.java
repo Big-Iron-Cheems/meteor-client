@@ -5,10 +5,10 @@
 
 package meteordevelopment.meteorclient.utils.render;
 
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import meteordevelopment.meteorclient.renderer.MeshBuilder;
 import meteordevelopment.meteorclient.utils.render.color.Color;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.renderer.rendertype.RenderType;
 
 public class MeshBuilderVertexConsumerProvider implements IVertexConsumerProvider {
     private final MeshBuilderVertexConsumer vertexConsumer;
@@ -18,7 +18,7 @@ public class MeshBuilderVertexConsumerProvider implements IVertexConsumerProvide
     }
 
     @Override
-    public VertexConsumer getBuffer(RenderLayer layer) {
+    public VertexConsumer getBuffer(RenderType layer) {
         return vertexConsumer;
     }
 
@@ -54,7 +54,7 @@ public class MeshBuilderVertexConsumerProvider implements IVertexConsumerProvide
         }
 
         @Override
-        public VertexConsumer vertex(float x, float y, float z) {
+        public VertexConsumer addVertex(float x, float y, float z) {
             xs[i] = (double) offsetX + x;
             ys[i] = (double) offsetY + y;
             zs[i] = (double) offsetZ + z;
@@ -76,37 +76,37 @@ public class MeshBuilderVertexConsumerProvider implements IVertexConsumerProvide
         }
 
         @Override
-        public VertexConsumer color(int red, int green, int blue, int alpha) {
+        public VertexConsumer setColor(int red, int green, int blue, int alpha) {
             return this;
         }
 
         @Override
-        public VertexConsumer color(int argb) {
+        public VertexConsumer setColor(int argb) {
             return this;
         }
 
         @Override
-        public VertexConsumer texture(float u, float v) {
+        public VertexConsumer setUv(float u, float v) {
             return this;
         }
 
         @Override
-        public VertexConsumer overlay(int u, int v) {
+        public VertexConsumer setUv1(int u, int v) {
             return this;
         }
 
         @Override
-        public VertexConsumer light(int u, int v) {
+        public VertexConsumer setUv2(int u, int v) {
             return this;
         }
 
         @Override
-        public VertexConsumer normal(float x, float y, float z) {
+        public VertexConsumer setNormal(float x, float y, float z) {
             return null;
         }
 
         @Override
-        public VertexConsumer lineWidth(float width) {
+        public VertexConsumer setLineWidth(float width) {
             return this;
         }
 

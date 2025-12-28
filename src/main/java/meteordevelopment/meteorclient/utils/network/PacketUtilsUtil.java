@@ -5,9 +5,9 @@
 
 package meteordevelopment.meteorclient.utils.network;
 
-import net.minecraft.network.packet.BundlePacket;
-import net.minecraft.network.packet.BundleSplitterPacket;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.BundleDelimiterPacket;
+import net.minecraft.network.protocol.BundlePacket;
+import net.minecraft.network.protocol.Packet;
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
 
@@ -53,7 +53,7 @@ public class PacketUtilsUtil {
             writer.write("import com.google.common.collect.Sets;\n");
             writer.write("import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;\n");
             writer.write("import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;\n");
-            writer.write("import net.minecraft.network.packet.Packet;\n\n");
+            writer.write("import net.minecraft.network.protocol.Packet;\n\n");
 
             writer.write("import java.util.Map;\n");
             writer.write("import java.util.Set;\n");
@@ -71,13 +71,23 @@ public class PacketUtilsUtil {
             //     Write static block
             writer.write("    static {\n");
 
-            // Process packets
-            processPackets(writer, "net.minecraft.network.packet.c2s", "C2S_PACKETS", "C2S_PACKETS_R",
-                packet -> false // No exclusions for C2S packets
+            // Process packets - scan all protocol subpackages
+            processPackets(writer, "net.minecraft.network.protocol", "C2S_PACKETS", "C2S_PACKETS_R",
+                packet -> {
+                    String name = packet.getSimpleName();
+                    return !name.startsWith("Serverbound") ||
+                        BundlePacket.class.isAssignableFrom(packet) ||
+                        BundleDelimiterPacket.class.isAssignableFrom(packet);
+                }
             );
             writer.newLine();
-            processPackets(writer, "net.minecraft.network.packet.s2c", "S2C_PACKETS", "S2C_PACKETS_R",
-                packet -> BundlePacket.class.isAssignableFrom(packet) || BundleSplitterPacket.class.isAssignableFrom(packet)
+            processPackets(writer, "net.minecraft.network.protocol", "S2C_PACKETS", "S2C_PACKETS_R",
+                packet -> {
+                    String name = packet.getSimpleName();
+                    return !name.startsWith("Clientbound") ||
+                        BundlePacket.class.isAssignableFrom(packet) ||
+                        BundleDelimiterPacket.class.isAssignableFrom(packet);
+                }
             );
 
             writer.write("    }\n\n");
