@@ -5,26 +5,14 @@
 
 package meteordevelopment.meteorclient.renderer.text;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.PoseStack;
+import meteordevelopment.meteorclient.systems.hud.HudRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
-import net.minecraft.client.gui.Font.DisplayMode;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.util.LightCoordsUtil;
-import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class VanillaTextRenderer implements TextRenderer {
     public static final VanillaTextRenderer INSTANCE = new VanillaTextRenderer();
-
-    private final ByteBufferBuilder buffer = new ByteBufferBuilder(2048);
-    private final MultiBufferSource.BufferSource immediate = MultiBufferSource.immediate(buffer);
-
-    private final PoseStack matrices = new PoseStack();
-    private final Matrix4f emptyMatrix = new Matrix4f();
 
     public double scale = 2;
     public boolean scaleIndividually;
@@ -73,18 +61,23 @@ public class VanillaTextRenderer implements TextRenderer {
         int preA = color.a;
         color.a = (int) (((double) color.a / 255 * alpha) * 255);
 
-        Matrix4f matrix = emptyMatrix;
-        if (scaleIndividually) {
-            matrices.pushPose();
-            matrices.scale((float) scale, (float) scale, 1);
-            matrix = matrices.last().pose();
+        GuiGraphicsExtractor graphics = HudRenderer.INSTANCE.graphics;
+        if (graphics != null) {
+            var pose = graphics.pose();
+            pose.pushMatrix();
+            pose.scale((float) scale);
+
+            if (shadow) {
+                int packed = color.getPacked();
+                int shadowColor = (packed & 0xFF000000) | ((packed & 0x00FCFCFC) >> 2);
+                graphics.text(mc.font, text, (int) (x / scale) + 1, (int) (y / scale) + 1, shadowColor);
+            }
+            graphics.text(mc.font, text, (int) (x / scale), (int) (y / scale), color.getPacked());
+
+            pose.popMatrix();
         }
 
-        mc.font.drawInBatch(text, (float) (x / scale), (float) (y / scale), color.getPacked(), shadow, matrix, immediate, DisplayMode.NORMAL, 0, LightCoordsUtil.FULL_BRIGHT);
         double x2 = (x / scale) + mc.font.width(text);
-
-        if (scaleIndividually) matrices.popPose();
-
         color.a = preA;
 
         if (!wasBuilding) end();
@@ -99,15 +92,6 @@ public class VanillaTextRenderer implements TextRenderer {
     @Override
     public void end() {
         if (!building) throw new RuntimeException("VanillaTextRenderer.end() called without calling begin()");
-
-        Matrix4fStack matrixStack = RenderSystem.getModelViewStack();
-
-        matrixStack.pushMatrix();
-        if (!scaleIndividually) matrixStack.scale((float) scale, (float) scale, 1);
-
-        immediate.endBatch();
-
-        matrixStack.popMatrix();
 
         this.scale = 2;
         this.building = false;
