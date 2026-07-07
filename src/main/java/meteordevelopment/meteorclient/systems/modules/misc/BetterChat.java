@@ -256,6 +256,7 @@ public class BetterChat extends Module {
     @EventHandler
     private void onMessageReceive(ReceiveMessageEvent event) {
         Component message = event.getMessage();
+        Component original = message;
 
         if (filterRegex.get()) {
             String messageString = message.getString();
@@ -297,7 +298,9 @@ public class BetterChat extends Module {
             message = Component.empty().append(timestamp).append(message);
         }
 
-        event.setMessage(message);
+        // Only flag the event modified when we actually changed the message. Calling setMessage
+        // unconditionally forced a 26.2 render path that blanked incoming messages.
+        if (message != original) event.setMessage(message);
     }
 
     @EventHandler
