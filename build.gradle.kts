@@ -64,6 +64,15 @@ configurations {
     }
 }
 
+// Compile-only stubs for vanilla classes removed in 26.2 but still referenced by the (not-yet-26.2)
+// Baritone API surface. Never shipped in the jar; satisfies javac symbol resolution only.
+// Remove once a 26.2 Baritone build exists. Declared before `dependencies` so it resolves there.
+val stub: SourceSet by sourceSets.creating {
+    java {
+        srcDir("src/stub/java")
+    }
+}
+
 dependencies {
     // Fabric
     minecraft(libs.minecraft)
@@ -82,6 +91,7 @@ dependencies {
     compileOnly(libs.viafabricplus.api) { isTransitive = false }
 
     compileOnly(libs.baritone)
+    compileOnly(stub.output) // net.minecraft.util.Tuple stub for the 26.1 Baritone API
     compileOnly(libs.modmenu)
 
     // Libraries (JAR-in-JAR)
