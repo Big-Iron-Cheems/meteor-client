@@ -10,6 +10,9 @@ accessible   class   net/minecraft/client/multiplayer/ClientChunkCache$Storage
 # SaveMapCommand#saveMap
 accessible   field   net/minecraft/client/resources/MapTextureManager$MapInstance texture Lnet/minecraft/client/renderer/texture/DynamicTexture;
 
+# LevelRendererMixin#meteor$pushEntityOutlineFramebuffer reassigns entityOutlineTarget (became final in 26.2)
+mutable      field   net/minecraft/client/renderer/LevelRenderer entityOutlineTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
+
 # BeaconScreenMixin#changeButtons
 accessible   class   net/minecraft/client/gui/screens/inventory/BeaconScreen$BeaconPowerButton
 accessible   class   net/minecraft/client/gui/screens/inventory/BeaconScreen$BeaconConfirmButton
