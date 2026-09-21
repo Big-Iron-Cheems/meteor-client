@@ -117,9 +117,9 @@ public class Notebot extends Module {
         .build()
     );
 
-    public final Setting<Boolean> roundOutOfRange = sgGeneral.add(new BoolSetting.Builder()
-        .name("round-out-of-range")
-        .description("Rounds out of range notes")
+    public final Setting<Boolean> transposeOutOfRange = sgGeneral.add(new BoolSetting.Builder()
+        .name("transpose-out-of-range")
+        .description("Transposes out of range notes")
         .defaultValue(false)
         .build()
     );
